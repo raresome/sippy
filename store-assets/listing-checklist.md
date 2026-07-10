@@ -61,9 +61,13 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
 
 ## Privacy policy
 - [ ] Publish `store-assets/privacy-policy.html` to a public URL.
+- [ ] **GitHub Pages hosting:** the repo pushes to GitHub as a PUBLIC repo named `sippy`. Enable
+      Pages (Settings → Pages → branch `master`, root) to serve the file. The URL resolves to
+      `https://<owner>.github.io/sippy/privacy-policy.html`.
 - [ ] Confirm the URL in Play Console **and** in `www/js/main.js` (`PRIVACY_POLICY_URL`) match.
-      Current app value: `https://genartstudios.github.io/sippy/privacy-policy.html`. Decide between
-      that and `genartstudios.com/apps/sippy`, then make both places agree.
+      App value is hardcoded to `https://genartstudios.github.io/sippy/privacy-policy.html` — this
+      only resolves if the repo owner is an account/org named `genartstudios`. If the owner
+      username differs, update `PRIVACY_POLICY_URL` to `https://<owner>.github.io/sippy/...`.
 - [ ] Replace the placeholder contact email `support@genartstudios.com` with a real, monitored inbox.
 
 ## Build & release
