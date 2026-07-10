@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The Games APP_ID meta-data lives in the app manifest (android/app/src/main/AndroidManifest.xml),
+         not here: it references @string/game_app_id, which the app module owns. -->
+</manifest>

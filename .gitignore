@@ -1,0 +1,24 @@
+node_modules/
+
+# Gradle build outputs (any module: app, capacitor plugins, local plugins/playgames)
+build/
+.gradle/
+android/local.properties
+.cxx/
+
+# Secrets / signing (never commit)
+android/app/google-services.json
+key.properties
+*.keystore
+*.jks
+*.aab
+*.apk
+
+.DS_Store
+
+# Local tooling & scratch (not part of the project)
+.claude/settings.local.json
+.antigravitycli/
+.playwright-mcp/
+# Loose device/dev screenshots captured during past sessions
+/_*.png

@@ -1,0 +1,21 @@
+{
+  "name": "sippy-playgames",
+  "version": "1.0.0",
+  "description": "Local Capacitor plugin: Google Play Games Services v2 (sign-in, leaderboards, achievements).",
+  "private": true,
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "files": [
+    "android/",
+    "src/"
+  ],
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  }
+}

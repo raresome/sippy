@@ -1,0 +1,8 @@
+{
+  "appId": "com.genartstudios.sippy",
+  "appName": "SIPPY",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#241647"
+  }
+}

@@ -1,0 +1,13 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SIPPY</string>
+    <string name="title_activity_main">SIPPY</string>
+    <string name="package_name">com.genartstudios.sippy</string>
+    <string name="custom_url_scheme">com.genartstudios.sippy</string>
+
+    <!-- Play Games Services v2 project id, from Play Console → Grow → Play Games Services.
+         Until this holds a real numeric id, the APP_ID meta-data stays commented out in
+         AndroidManifest.xml (Play Services errors on a non-numeric id). Keep in sync with
+         PLAY_GAMES_APP_ID in www/js/gameids.js. -->
+    <string name="game_app_id" translatable="false">REPLACE_WITH_PLAY_GAMES_APP_ID</string>
+</resources>

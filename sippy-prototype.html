@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SIPPY — one more sip</title>
+<style>
+  :root{
+    --night:#191033;
+    --night2:#241647;
+    --cream:#FFF3D6;
+    --blood:#FF4D5E;
+    --amber:#FFB23E;
+    --teal:#2E6E63;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;background:var(--night);
+    font-family:"Arial Rounded MT Bold","Helvetica Rounded",ui-rounded,"Segoe UI",system-ui,sans-serif;
+    touch-action:none;user-select:none;-webkit-user-select:none;}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;}
+  canvas{display:block;}
+  /* ---------- overlays ---------- */
+  .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;padding:24px;text-align:center;color:var(--cream);z-index:10;
+    background:radial-gradient(ellipse at 50% 35%, rgba(36,22,71,.55), rgba(15,9,32,.92));
+    opacity:0;pointer-events:none;transition:opacity .35s ease;}
+  .overlay.show{opacity:1;pointer-events:auto;}
+  .card{background:#251a4d;border:3px solid #3d2b78;border-radius:22px;padding:22px 26px;max-width:330px;width:100%;
+    box-shadow:0 14px 40px rgba(0,0,0,.5);}
+  .card h2{font-size:30px;letter-spacing:1px;margin-bottom:4px;}
+  .card .sub{font-size:13px;opacity:.75;margin-bottom:14px;}
+  .statrow{display:flex;justify-content:space-between;font-size:15px;padding:7px 2px;border-bottom:1px dashed #3d2b78;}
+  .statrow:last-of-type{border-bottom:none;}
+  .statrow b{color:var(--amber);}
+  .statrow b.red{color:var(--blood);}
+  .btn{font:inherit;font-size:17px;letter-spacing:.5px;color:#1a1033;background:var(--amber);border:none;
+    border-radius:999px;padding:13px 30px;cursor:pointer;box-shadow:0 5px 0 #c77f17;transition:transform .08s;}
+  .btn:active{transform:translateY(3px);box-shadow:0 2px 0 #c77f17;}
+  .btn.ghost{background:transparent;color:var(--cream);box-shadow:none;border:2px solid #4a368c;font-size:14px;padding:10px 22px;}
+  .tiny{font-size:11px;opacity:.5;}
+  #toast{position:fixed;left:50%;bottom:9%;transform:translateX(-50%) translateY(20px);background:var(--cream);color:#1a1033;
+    font-size:13px;padding:9px 18px;border-radius:999px;opacity:0;transition:all .3s;z-index:20;pointer-events:none;}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  @media (prefers-reduced-motion: reduce){ .overlay{transition:none;} }
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="cv"></canvas></div>
+
+<div class="overlay" id="overGameover">
+  <div class="card">
+    <h2 id="goTitle">SPLAT.</h2>
+    <div class="sub" id="goSub">Greed got you.</div>
+    <div class="statrow"><span>Blood banked</span><b id="goBank">0 mL</b></div>
+    <div class="statrow"><span>Lost in the slap</span><b class="red" id="goLost">0 mL</b></div>
+    <div class="statrow"><span>Giants survived</span><b id="goGiants">0</b></div>
+    <div class="statrow"><span>Closest call</span><b id="goClose">—</b></div>
+    <div class="statrow"><span>Best night ever</span><b id="goBest">0 mL</b></div>
+  </div>
+  <button class="btn" id="btnRetry">One more night 🦟</button>
+  <button class="btn ghost" id="btnBrag">Copy brag for the group chat</button>
+</div>
+
+<div id="toast">Copied!</div>
+
+<script>
+"use strict";
+/* ============================================================
+   SIPPY — hold to drink, release to live.
+   100% procedural: every pixel drawn in code, every sound synthesized.
+   ============================================================ */
+
+/* ---------- canvas / scaling ---------- */
+const W = 420, H = 740;
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let scale = 1;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+  cv.width = Math.round(W * scale * dpr);
+  cv.height = Math.round(H * scale * dpr);
+  cv.style.width  = Math.round(W * scale) + 'px';
+  cv.style.height = Math.round(H * scale) + 'px';
+  ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+
+/* ---------- tiny helpers ---------- */
+const rnd  = (a,b)=>a+Math.random()*(b-a);
+const irnd = (a,b)=>Math.floor(rnd(a,b+1));
+const pick = a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp =(a,b,t)=>a+(b-a)*t;
+const ease =t=>t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+
+/* ============================================================
+   AUDIO — all synthesized
+   ============================================================ */
+const AudioSys = {
+  ctx:null, master:null, buzz:null, slurp:null, snoreTimer:0, heartTimer:0,
+  init(){
+    if(this.ctx) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    this.ctx = new AC();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0.55;
+    this.master.connect(this.ctx.destination);
+  },
+  resume(){ if(this.ctx && this.ctx.state==='suspended') this.ctx.resume(); },
+  now(){ return this.ctx ? this.ctx.currentTime : 0; },
+
+  /* --- mosquito buzz: two detuned saws through a wobbling bandpass --- */
+  startBuzz(){
+    if(!this.ctx || this.buzz) return;
+    const t = this.now();
+    const o1=this.ctx.createOscillator(), o2=this.ctx.createOscillator();
+    o1.type='sawtooth'; o2.type='sawtooth';
+    o1.frequency.value=580; o2.frequency.value=587;
+    const bp=this.ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=900; bp.Q.value=2;
+    const g=this.ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.05,t+.15);
+    const lfo=this.ctx.createOscillator(); lfo.frequency.value=22;
+    const lg=this.ctx.createGain(); lg.gain.value=60;
+    lfo.connect(lg); lg.connect(o1.frequency);
+    o1.connect(bp); o2.connect(bp); bp.connect(g); g.connect(this.master);
+    o1.start(); o2.start(); lfo.start();
+    this.buzz={o1,o2,g,lfo};
+  },
+  setBuzzWeight(f){ // 0 light → 1 engorged: buzz gets lower & labored
+    if(!this.buzz) return;
+    const base = lerp(580, 240, f);
+    this.buzz.o1.frequency.setTargetAtTime(base, this.now(), .1);
+    this.buzz.o2.frequency.setTargetAtTime(base+7, this.now(), .1);
+    this.buzz.lfo.frequency.setTargetAtTime(lerp(22,9,f), this.now(), .1);
+  },
+  stopBuzz(){
+    if(!this.buzz) return;
+    const {o1,o2,g,lfo}=this.buzz, t=this.now();
+    g.gain.setTargetAtTime(0,t,.08);
+    setTimeout(()=>{try{o1.stop();o2.stop();lfo.stop();}catch(e){}},300);
+    this.buzz=null;
+  },
+
+  /* --- slurp: rising sine with bubbly vibrato while drinking --- */
+  startSlurp(){
+    if(!this.ctx || this.slurp) return;
+    const t=this.now();
+    const o=this.ctx.createOscillator(); o.type='sine'; o.frequency.value=160;
+    const v=this.ctx.createOscillator(); v.frequency.value=11;
+    const vg=this.ctx.createGain(); vg.gain.value=24;
+    v.connect(vg); vg.connect(o.frequency);
+    const g=this.ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.07,t+.1);
+    o.connect(g); g.connect(this.master); o.start(); v.start();
+    this.slurp={o,v,g};
+  },
+  setSlurp(f){ if(this.slurp) this.slurp.o.frequency.setTargetAtTime(lerp(160,520,f), this.now(), .15); },
+  stopSlurp(){
+    if(!this.slurp) return;
+    const {o,v,g}=this.slurp,t=this.now();
+    g.gain.setTargetAtTime(0,t,.05);
+    setTimeout(()=>{try{o.stop();v.stop();}catch(e){}},200);
+    this.slurp=null;
+  },
+
+  /* --- one-shots --- */
+  blip(freq=440,dur=.12,type='square',vol=.12){
+    if(!this.ctx) return;
+    const t=this.now(), o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(.001,t+dur);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t+dur);
+  },
+  snore(inhale){ // filtered noise breath
+    if(!this.ctx) return;
+    const t=this.now(), dur= inhale? .65 : .5;
+    const buf=this.ctx.createBuffer(1, this.ctx.sampleRate*dur, this.ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    const src=this.ctx.createBufferSource(); src.buffer=buf;
+    const f=this.ctx.createBiquadFilter(); f.type='lowpass';
+    f.frequency.setValueAtTime(inhale?300:200,t);
+    f.frequency.linearRampToValueAtTime(inhale?520:120,t+dur);
+    const g=this.ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(inhale?.14:.09,t+dur*.3);
+    g.gain.linearRampToValueAtTime(0,t+dur);
+    src.connect(f); f.connect(g); g.connect(this.master); src.start(t);
+  },
+  heartbeat(intensity){
+    if(!this.ctx) return;
+    const t=this.now(), o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(70,t); o.frequency.exponentialRampToValueAtTime(40,t+.12);
+    const v=.05+intensity*.14;
+    g.gain.setValueAtTime(v,t); g.gain.exponentialRampToValueAtTime(.001,t+.14);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t+.15);
+  },
+  gasp(){ // wind-up alert
+    if(!this.ctx) return;
+    const t=this.now(), o=this.ctx.createOscillator(), g=this.ctx.createGain();
+    o.type='sawtooth'; o.frequency.setValueAtTime(220,t); o.frequency.exponentialRampToValueAtTime(880,t+.18);
+    g.gain.setValueAtTime(.1,t); g.gain.exponentialRampToValueAtTime(.001,t+.22);
+    o.connect(g); g.connect(this.master); o.start(t); o.stop(t+.25);
+  },
+  slap(){
+    if(!this.ctx) return;
+    const t=this.now();
+    const buf=this.ctx.createBuffer(1,this.ctx.sampleRate*.25,this.ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,2);
+    const src=this.ctx.createBufferSource(); src.buffer=buf;
+    const g=this.ctx.createGain(); g.gain.value=.5;
+    src.connect(g); g.connect(this.master); src.start(t);
+    const o=this.ctx.createOscillator(), og=this.ctx.createGain();
+    o.type='sine'; o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(35,t+.3);
+    og.gain.setValueAtTime(.4,t); og.gain.exponentialRampToValueAtTime(.001,t+.35);
+    o.connect(og); og.connect(this.master); o.start(t); o.stop(t+.4);
+  },
+  jingle(clutch){
+    if(!this.ctx) return;
+    const notes = clutch ? [523,659,784,1047,1319] : [523,659,784];
+    notes.forEach((f,i)=> setTimeout(()=>this.blip(f,.18,'triangle',.12), i*85));
+  },
+  harp(){
+    if(!this.ctx) return;
+    [880,784,659,587,523].forEach((f,i)=> setTimeout(()=>this.blip(f,.4,'sine',.07), i*150));
+  }
+};
+
+/* ============================================================
+   GIANT GENERATOR — a new sleeper every round
+   ============================================================ */
+const FIRST = ["Uncle","Big","Gym","Nonna","Coach","Chef","Officer","Baby","Grandpa","DJ","Sleepy","Cousin","Auntie","Captain"];
+const NAMES = ["Tito","Greg","Pia","Steve","Brenda","Marv","Lucia","Dwayne","Bertha","Carl","Yolanda","Bruno","Fanny","Reginald"];
+const SLEEPERS = [
+  {label:"Deep Sleeper",  irrBase:7,  windup:560, spike:.10, hint:"Snores like a freight train."},
+  {label:"Light Sleeper", irrBase:13, windup:380, spike:.18, hint:"One wrong slurp and it's over."},
+  {label:"Chaotic Napper",irrBase:9,  windup:460, spike:.42, hint:"Twitchy. Unpredictable. Rude."},
+];
+const SKINS = ["#F2B68C","#E8A06B","#C98850","#A86B3F","#8C5430","#F5C9A2"];
+const HAIRC = ["#3B2A20","#101010","#B8B8B8","#C9722B","#6B4FA0","#244D8A","#0a7a5a"];
+
+function makeGiant(night){
+  const s = pick(SLEEPERS);
+  return {
+    name: pick(FIRST)+" "+pick(NAMES),
+    type: s,
+    skin: pick(SKINS),
+    hair: pick(HAIRC),
+    hairstyle: irnd(0,3),        // 0 bald, 1 tuft, 2 curls, 3 mohawk
+    mustache: Math.random()<.45,
+    blush: Math.random()<.5,
+    noseScale: rnd(.85,1.35),
+    earring: Math.random()<.25,
+    // difficulty scales with night
+    irrRate: s.irrBase * (1 + (night-1)*0.16),
+    windupMs: Math.max(240, s.windup - (night-1)*22),
+    spikeChance: s.spike,
+  };
+}
+
+/* ============================================================
+   GAME STATE
+   ============================================================ */
+const G = {
+  state:'title',        // title | flyin | landed | drinking | windup | escape | splat | gameover
+  t:0,                  // state timer (s)
+  night:1,
+  banked:0,
+  best: 0,
+  giant:null,
+  holdT:0,              // seconds drinking this sip
+  blood:0,              // current unbanked sip (mL)
+  irritation:0,         // hidden 0..100
+  windupT:0,            // ms remaining in windup
+  closest:Infinity,     // best escape margin (s)
+  giantsSurvived:0,
+  shake:0, flash:0,
+  zzz:[], particles:[], stars:[],
+  sippy:{x:W/2,y:-60,tx:0,ty:0,wob:0},
+  snorePhase:0, snoreHold:0,
+  twitch:{brow:0,hand:0,nose:0},
+  handAnim:0,           // 0 rest → 1 slapped
+  clutch:false,
+  lostBlood:0,
+  msg:"", msgT:0,
+};
+
+for(let i=0;i<46;i++) G.stars.push({x:rnd(0,W),y:rnd(0,H*.55),r:rnd(.6,1.8),tw:rnd(0,6.28)});
+
+const LAND = {x: W*0.565, y: H*0.595}; // cheek landing spot
+
+function newGiant(){
+  G.giant = makeGiant(G.night);
+  G.irritation = 0; G.holdT = 0; G.blood = 0; G.windupT = 0;
+  G.handAnim = 0; G.clutch = false;
+  G.sippy.x = rnd(60,W-60); G.sippy.y = -50;
+  setState('flyin');
+}
+function setState(s){ G.state = s; G.t = 0; }
+
+function startNight(){
+  G.night = 1; G.banked = 0; G.giantsSurvived = 0; G.closest = Infinity; G.lostBlood = 0;
+  newGiant();
+}
+
+/* ---------- scoring ---------- */
+function sipBlood(t){ return 6*t + 7*t*t; }            // mL — quadratic = greed pays
+function multOf(t){ return (1 + t*t*0.32).toFixed(1); }
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+let pointerDown = false;
+function press(){
+  AudioSys.init(); AudioSys.resume();
+  pointerDown = true;
+  if(G.state==='title'){ startNight(); return; }
+  if(G.state==='landed'){
+    setState('drinking');
+    AudioSys.startSlurp();
+  }
+}
+function release(){
+  pointerDown = false;
+  if(G.state==='drinking'){ escapeNow(false); }
+  else if(G.state==='windup'){ escapeNow(true); }
+}
+addEventListener('pointerdown', e=>{ if(e.target.closest('.overlay,button')) return; press(); });
+addEventListener('pointerup', release);
+addEventListener('pointercancel', release);
+addEventListener('keydown', e=>{ if(e.code==='Space' && !e.repeat) press(); });
+addEventListener('keyup',   e=>{ if(e.code==='Space') release(); });
+
+/* ============================================================
+   STATE TRANSITIONS
+   ============================================================ */
+function escapeNow(duringWindup){
+  AudioSys.stopSlurp();
+  let gained = G.blood;
+  if(duringWindup){
+    G.clutch = true;
+    const margin = G.windupT/1000;
+    G.closest = Math.min(G.closest, margin);
+    gained = Math.round(gained*1.5);
+    showMsg("CLUTCH! ×1.5  —  "+margin.toFixed(2)+"s from the slap", 2.2);
+    // hand completes its slap… onto the giant's own cheek
+    G.handAnim = 0.0001;
+  } else if(G.blood>2){
+    showMsg("Banked "+Math.round(gained)+" mL", 1.4);
+  }
+  G.banked += Math.round(gained);
+  G.giantsSurvived++;
+  AudioSys.jingle(duringWindup);
+  burst(G.sippy.x, G.sippy.y, '#FF4D5E', 14);
+  setState('escape');
+}
+function triggerWindup(){
+  setState('windup');
+  G.windupT = G.giant.windupMs;
+  AudioSys.gasp();
+}
+function splat(){
+  AudioSys.stopSlurp(); AudioSys.stopBuzz(); AudioSys.slap();
+  G.lostBlood = Math.round(G.blood);
+  G.shake = reducedMotion? 4 : 16; G.flash = 1;
+  burst(G.sippy.x, G.sippy.y, '#FF4D5E', 30);
+  burst(G.sippy.x, G.sippy.y, '#FFF3D6', 16);
+  setState('splat');
+  setTimeout(()=>AudioSys.harp(), 700);
+}
+function showMsg(m,t){ G.msg=m; G.msgT=t; }
+function burst(x,y,color,n){
+  for(let i=0;i<n;i++){
+    const a=rnd(0,6.283), sp=rnd(40,220);
+    G.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-60,r:rnd(2,5),c:color,life:rnd(.5,1.1)});
+  }
+}
+
+/* ============================================================
+   UPDATE
+   ============================================================ */
+let last = performance.now();
+function update(dt){
+  G.t += dt;
+  if(G.msgT>0) G.msgT-=dt;
+  G.shake = Math.max(0, G.shake - dt*40);
+  G.flash = Math.max(0, G.flash - dt*2.5);
+
+  // snore cycle (always, unless splatted recently)
+  if(G.giant && G.state!=='gameover'){
+    const agitated = G.irritation>60 || G.state==='windup';
+    G.snorePhase += dt / (agitated? 1.1 : 1.9);
+    if(G.snorePhase>=1){
+      G.snorePhase=0;
+      if(G.state!=='splat'){ AudioSys.snore(true); setTimeout(()=>AudioSys.snore(false),650); }
+      // spawn a Z
+      G.zzz.push({x:LAND.x+150, y:LAND.y-60, vy:-rnd(18,30), vx:rnd(4,14), s:rnd(12,22),
+                  red: G.irritation>55, life:3, rot:rnd(-.4,.4)});
+    }
+  }
+  G.zzz.forEach(z=>{z.x+=z.vx*dt; z.y+=z.vy*dt; z.life-=dt;});
+  G.zzz = G.zzz.filter(z=>z.life>0);
+
+  G.particles.forEach(p=>{p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=380*dt; p.life-=dt;});
+  G.particles = G.particles.filter(p=>p.life>0);
+
+  // twitch decay
+  G.twitch.brow=Math.max(0,G.twitch.brow-dt*3);
+  G.twitch.hand=Math.max(0,G.twitch.hand-dt*3);
+  G.twitch.nose=Math.max(0,G.twitch.nose-dt*3);
+
+  switch(G.state){
+    case 'flyin':{
+      AudioSys.startBuzz(); AudioSys.setBuzzWeight(0);
+      const p = ease(clamp(G.t/1.3,0,1));
+      G.sippy.x = lerp(G.sippy.x, LAND.x, dt*4.5);
+      G.sippy.y = lerp(-50, LAND.y, p) + Math.sin(G.t*9)*6*(1-p);
+      if(G.t>=1.35){ G.sippy.x=LAND.x; G.sippy.y=LAND.y; setState('landed'); }
+      break;
+    }
+    case 'landed':{
+      AudioSys.setBuzzWeight(0);
+      if(pointerDown){ setState('drinking'); AudioSys.startSlurp(); }
+      break;
+    }
+    case 'drinking':{
+      G.holdT += dt;
+      G.blood = sipBlood(G.holdT);
+      const fullness = clamp(G.holdT/7,0,1);
+      AudioSys.setBuzzWeight(fullness);
+      AudioSys.setSlurp(fullness);
+      // irritation
+      let rate = G.giant.irrRate * (1 + G.holdT*0.5);
+      G.irritation += rate*dt;
+      if(Math.random() < G.giant.spikeChance*dt*3){ // random spike + visible tell
+        G.irritation += rnd(4,11);
+        const which = pick(['brow','hand','nose']);
+        G.twitch[which]=1;
+        AudioSys.blip(140,.08,'sine',.06);
+      }
+      // threshold tells
+      if(G.irritation>35) G.twitch.brow=Math.max(G.twitch.brow,.4);
+      if(G.irritation>65) G.twitch.hand=Math.max(G.twitch.hand,.5);
+      // heartbeat tension
+      G.heartAcc = (G.heartAcc||0) + dt;
+      const beatGap = lerp(1.0, .28, clamp(G.irritation/100,0,1));
+      if(G.heartAcc>beatGap){ G.heartAcc=0; AudioSys.heartbeat(clamp(G.irritation/100,0,1)); }
+      if(G.irritation>=100) triggerWindup();
+      break;
+    }
+    case 'windup':{
+      G.holdT += dt;            // still drinking! greed continues
+      G.blood = sipBlood(G.holdT);
+      G.windupT -= dt*1000;
+      G.twitch.hand=1;
+      if(G.windupT<=0) splat();
+      break;
+    }
+    case 'escape':{
+      const fullness=clamp(G.holdT/7,0,1);
+      AudioSys.setBuzzWeight(fullness);
+      // heavy wobbling takeoff — the fuller, the slower & funnier
+      const spd = lerp(260, 90, fullness);
+      G.sippy.y -= spd*dt;
+      G.sippy.x += Math.sin(G.t*lerp(10,4,fullness))*lerp(1.5,4,fullness);
+      G.sippy.wob = Math.sin(G.t*12)*fullness;
+      if(G.clutch && G.handAnim>0 && G.handAnim<1){
+        G.handAnim=Math.min(1,G.handAnim+dt*5);
+        if(G.handAnim>=1 && !G.selfSlapped){ G.selfSlapped=true; AudioSys.slap(); G.shake=reducedMotion?3:10; showMsg(G.giant.name+" slapped himself.",2);}
+      }
+      if(G.sippy.y < -70){
+        G.selfSlapped=false;
+        G.night++; AudioSys.stopBuzz();
+        newGiant();
+      }
+      break;
+    }
+    case 'splat':{
+      G.handAnim = Math.min(1, G.handAnim + dt*7);
+      if(G.t>1.7){ endNight(); }
+      break;
+    }
+  }
+}
+
+function endNight(){
+  setState('gameover');
+  if(G.banked > G.best){ G.best = G.banked; }
+  document.getElementById('goBank').textContent  = G.banked+" mL";
+  document.getElementById('goLost').textContent  = G.lostBlood+" mL";
+  document.getElementById('goGiants').textContent= G.giantsSurvived;
+  document.getElementById('goClose').textContent = isFinite(G.closest)? G.closest.toFixed(2)+"s from death" : "played it safe";
+  document.getElementById('goBest').textContent  = G.best+" mL";
+  document.getElementById('goSub').textContent   = pick([
+    "Greed got you.","One sip too many.","He felt that.","You knew. You stayed.","The hand always wins eventually."
+  ]);
+  document.getElementById('overGameover').classList.add('show');
+}
+
+document.getElementById('btnRetry').addEventListener('click', ()=>{
+  document.getElementById('overGameover').classList.remove('show');
+  AudioSys.init(); AudioSys.resume();
+  startNight();
+});
+document.getElementById('btnBrag').addEventListener('click', ()=>{
+  const close = isFinite(G.closest)? " Escaped "+G.closest.toFixed(2)+"s before the slap." : "";
+  const txt = "🦟 SIPPY — drank "+G.banked+" mL from "+G.giantsSurvived+" sleeping giants."+close+" One more sip?";
+  (navigator.clipboard? navigator.clipboard.writeText(txt) : Promise.reject()).then(()=>{
+    const t=document.getElementById('toast'); t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'),1500);
+  }).catch(()=>{});
+});
+
+/* ============================================================
+   RENDER — every pixel procedural
+   ============================================================ */
+function render(){
+  const sx = (Math.random()-.5)*G.shake, sy=(Math.random()-.5)*G.shake;
+  ctx.save();
+  ctx.translate(sx,sy);
+
+  // --- night sky ---
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#0E0823'); grad.addColorStop(.55,'#241647'); grad.addColorStop(1,'#33205e');
+  ctx.fillStyle=grad; ctx.fillRect(-20,-20,W+40,H+40);
+
+  // stars
+  const tNow = performance.now()/1000;
+  G.stars.forEach(s=>{
+    ctx.globalAlpha = .35 + .65*Math.abs(Math.sin(tNow + s.tw));
+    ctx.fillStyle='#FFF3D6';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,7); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // moon
+  ctx.fillStyle='#FFF3D6';
+  ctx.beginPath(); ctx.arc(W-72,86,34,0,7); ctx.fill();
+  ctx.fillStyle='#0E0823'; ctx.globalAlpha=.92;
+  ctx.beginPath(); ctx.arc(W-84,78,30,0,7); ctx.fill();
+  ctx.globalAlpha=1;
+
+  // window frame hint (we're inside the bedroom)
+  ctx.strokeStyle='rgba(255,243,214,.07)'; ctx.lineWidth=10;
+  ctx.strokeRect(26,40,W-52,H*.34);
+  ctx.beginPath(); ctx.moveTo(W/2,40); ctx.lineTo(W/2,40+H*.34); ctx.stroke();
+
+  if(G.giant) drawGiant();
+  drawZzz();
+
+  // sippy (hidden during splat — he's under the hand)
+  if(G.state!=='splat' && G.state!=='gameover' && G.state!=='title') drawSippy();
+  if(G.state==='splat') drawSplatScene();
+
+  drawParticles();
+  drawHUD();
+  if(G.state==='title') drawTitle();
+
+  // danger vignette
+  const danger = (G.state==='drinking'||G.state==='windup') ? clamp(G.irritation/100,0,1) : 0;
+  if(danger>0.35){
+    const v=ctx.createRadialGradient(W/2,H/2,H*.25,W/2,H/2,H*.62);
+    v.addColorStop(0,'rgba(255,77,94,0)');
+    v.addColorStop(1,'rgba(255,77,94,'+(0.34*(danger-0.35)/0.65 * (0.6+0.4*Math.sin(tNow*9)))+')');
+    ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+  }
+  if(G.flash>0){ ctx.fillStyle='rgba(255,255,255,'+G.flash+')'; ctx.fillRect(0,0,W,H); }
+
+  ctx.restore();
+}
+
+/* ---------- giant ---------- */
+function drawGiant(){
+  const g=G.giant;
+  const cx=W*0.62, cy=H*0.78, R=170;
+  const browTw = G.twitch.brow * Math.sin(performance.now()/30)*3;
+  const noseTw = G.twitch.nose * Math.sin(performance.now()/25)*2;
+  const breathe = Math.sin(G.snorePhase*Math.PI*2)*4;
+
+  // blanket
+  ctx.fillStyle='#2E6E63';
+  ctx.beginPath();
+  ctx.moveTo(-10,H*0.86+breathe*.4);
+  for(let x=0;x<=W+20;x+=42) ctx.quadraticCurveTo(x+21,H*0.83+breathe*.4, x+42,H*0.86+breathe*.4);
+  ctx.lineTo(W+10,H+10); ctx.lineTo(-10,H+10); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.18)';
+  ctx.fillRect(-10,H*0.92,W+20,4);
+
+  // pillow
+  ctx.fillStyle='#EDE3FF';
+  rounded(cx-R-40, cy-40+breathe*.3, R*1.9, 110, 38); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.08)';
+  rounded(cx-R-40, cy+30+breathe*.3, R*1.9, 40, 20); ctx.fill();
+
+  // head
+  const hy = cy - 30 + breathe;
+  ctx.fillStyle=g.skin;
+  ctx.beginPath(); ctx.arc(cx,hy,R,0,7); ctx.fill();
+  // shading
+  ctx.fillStyle='rgba(0,0,0,.07)';
+  ctx.beginPath(); ctx.arc(cx+24,hy+26,R*.92,0,7); ctx.fill();
+  ctx.fillStyle=g.skin;
+  ctx.beginPath(); ctx.arc(cx-10,hy-8,R*.93,0,7); ctx.fill();
+
+  // ear
+  ctx.fillStyle=g.skin;
+  ctx.beginPath(); ctx.ellipse(cx+R*.78,hy-6,26,38,-.15,0,7); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(cx+R*.78,hy-4,12,-.6,2.2); ctx.stroke();
+  if(g.earring){ ctx.fillStyle='#FFB23E'; ctx.beginPath(); ctx.arc(cx+R*.78,hy+32,7,0,7); ctx.fill(); }
+
+  // hair
+  ctx.fillStyle=g.hair;
+  if(g.hairstyle===1){ // tuft
+    ctx.beginPath(); ctx.ellipse(cx-20,hy-R*.94,46,26,-.3,0,7); ctx.fill();
+  } else if(g.hairstyle===2){ // curls
+    for(let i=0;i<6;i++){ ctx.beginPath(); ctx.arc(cx-R*.7+i*46,hy-R*.82+Math.sin(i)*10,26,0,7); ctx.fill(); }
+  } else if(g.hairstyle===3){ // mohawk
+    for(let i=0;i<5;i++){
+      ctx.beginPath();
+      ctx.moveTo(cx-60+i*30,hy-R*.84);
+      ctx.lineTo(cx-45+i*30,hy-R*1.18);
+      ctx.lineTo(cx-30+i*30,hy-R*.84);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  // closed eyes
+  ctx.strokeStyle='rgba(20,10,30,.75)'; ctx.lineWidth=6; ctx.lineCap='round';
+  const ey=hy-26;
+  ctx.beginPath(); ctx.arc(cx-66,ey,22,0.25,Math.PI-0.25); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx+44,ey,22,0.25,Math.PI-0.25); ctx.stroke();
+  // brows (twitchy)
+  ctx.lineWidth=9;
+  const furrow = clamp((G.irritation-30)/70,0,1)*10;
+  ctx.beginPath(); ctx.moveTo(cx-92,ey-34+browTw+furrow); ctx.lineTo(cx-42,ey-40+browTw+furrow*1.4); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx+20,ey-40-browTw+furrow*1.4); ctx.lineTo(cx+70,ey-34-browTw+furrow); ctx.stroke();
+
+  // nose
+  ctx.fillStyle=g.skin;
+  ctx.beginPath(); ctx.ellipse(cx-10+noseTw,hy+22,30*g.noseScale,24*g.noseScale,0,0,7); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.12)';
+  ctx.beginPath(); ctx.ellipse(cx-10+noseTw,hy+30,26*g.noseScale,12*g.noseScale,0,0,7); ctx.fill();
+
+  // blush
+  if(g.blush){
+    ctx.fillStyle='rgba(255,120,120,.25)';
+    ctx.beginPath(); ctx.ellipse(cx-92,hy+34,24,14,0,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+72,hy+34,24,14,0,0,7); ctx.fill();
+  }
+
+  // mustache
+  if(g.mustache){
+    ctx.fillStyle=g.hair;
+    ctx.beginPath(); ctx.ellipse(cx-34,hy+52,28,11,.25,0,7); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx+14,hy+52,28,11,-.25,0,7); ctx.fill();
+  }
+
+  // mouth — open & snoring, more frowny as irritation grows
+  const mw = 16+Math.sin(G.snorePhase*Math.PI*2)*8;
+  ctx.fillStyle='rgba(60,20,30,.9)';
+  ctx.beginPath(); ctx.ellipse(cx-10,hy+74, 18, Math.max(6,mw),0,0,7); ctx.fill();
+
+  drawHand();
+}
+
+/* ---------- the HAND of fate ---------- */
+function drawHand(){
+  const fullness = clamp(G.holdT/7,0,1);
+  // rest position bottom-left; raised during windup; slams to LAND on splat
+  let hx = 70, hy = H*0.93, rot=-0.2, scaleH=1;
+  const handTw = G.twitch.hand * Math.sin(performance.now()/22)*5;
+  hy += handTw;
+
+  if(G.state==='windup'){
+    const p = 1 - clamp(G.windupT/G.giant.windupMs,0,1);
+    hx = lerp(70, 120, p); hy = lerp(H*0.93, H*0.62, p) + Math.sin(performance.now()/18)*4;
+    rot = lerp(-0.2, -1.0, p); scaleH = lerp(1,1.25,p);
+  } else if(G.state==='splat' || (G.clutch && G.handAnim>0)){
+    const p = ease(clamp(G.handAnim,0,1));
+    hx = lerp(120, LAND.x, p); hy = lerp(H*0.62, LAND.y+6, p);
+    rot = lerp(-1.0, 0.3, p); scaleH=1.25;
+  }
+
+  ctx.save();
+  ctx.translate(hx,hy); ctx.rotate(rot); ctx.scale(scaleH,scaleH);
+  // arm
+  ctx.fillStyle = G.giant.skin;
+  rounded(-34,-10, 70, 150, 30); ctx.fill();
+  // palm
+  ctx.beginPath(); ctx.ellipse(0,-30,46,40,0,0,7); ctx.fill();
+  // fingers
+  for(let i=0;i<4;i++){
+    ctx.save();
+    ctx.rotate(-0.55 + i*0.34);
+    rounded(-11,-92, 22, 56, 11); ctx.fill();
+    ctx.restore();
+  }
+  // thumb
+  ctx.save(); ctx.rotate(1.1); rounded(-12,-74,24,46,12); ctx.fill(); ctx.restore();
+  ctx.fillStyle='rgba(0,0,0,.08)';
+  ctx.beginPath(); ctx.ellipse(4,-22,38,30,0,0,7); ctx.fill();
+  ctx.restore();
+}
+
+/* ---------- SIPPY ---------- */
+function drawSippy(){
+  const s=G.sippy;
+  const fullness = clamp(G.holdT/7,0,1);
+  const bodyR = lerp(15, 42, fullness);
+  const t = performance.now()/1000;
+  const drinking = (G.state==='drinking'||G.state==='windup');
+  const squash = drinking? 1+Math.sin(t*16)*.04 : 1;
+
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  if(G.state==='escape') ctx.rotate(G.sippy.wob*.3);
+
+  // wings (frantic when escaping while full)
+  const wingSpeed = G.state==='escape'? 40 : 26;
+  const wA = Math.sin(t*wingSpeed)*0.9;
+  ctx.fillStyle='rgba(255,243,214,.45)';
+  ctx.save(); ctx.rotate(-0.5+wA*.3);
+  ctx.beginPath(); ctx.ellipse(-6,-bodyR-8, bodyR*.85, bodyR*.4, 0,0,7); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.rotate(0.2-wA*.3);
+  ctx.beginPath(); ctx.ellipse(8,-bodyR-8, bodyR*.85, bodyR*.4, 0,0,7); ctx.fill(); ctx.restore();
+
+  // dangly legs
+  ctx.strokeStyle='#2b1a4a'; ctx.lineWidth=3; ctx.lineCap='round';
+  for(let i=0;i<3;i++){
+    const lx=-bodyR*.5+i*bodyR*.5;
+    const sway=Math.sin(t*8+i)*4;
+    ctx.beginPath(); ctx.moveTo(lx,bodyR*.7);
+    ctx.quadraticCurveTo(lx+sway, bodyR*1.3, lx+sway*1.5, bodyR*1.6);
+    ctx.stroke();
+  }
+
+  // body — translucent belly filling with blood
+  ctx.save(); ctx.scale(squash, 1/squash);
+  ctx.fillStyle='#4a3580';
+  ctx.beginPath(); ctx.ellipse(0,0,bodyR,bodyR*.92,0,0,7); ctx.fill();
+  // blood fill
+  ctx.beginPath(); ctx.ellipse(0,0,bodyR-4,bodyR*.92-4,0,0,7); ctx.clip();
+  ctx.fillStyle='#FF4D5E';
+  const fillH = lerp(bodyR, -bodyR, fullness);
+  ctx.fillRect(-bodyR, fillH, bodyR*2, bodyR*2);
+  // slosh
+  ctx.fillStyle='rgba(255,255,255,.18)';
+  ctx.beginPath();
+  ctx.ellipse(Math.sin(t*5)*5, fillH, bodyR, 4, 0,0,7); ctx.fill();
+  ctx.restore();
+
+  // shine
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  ctx.beginPath(); ctx.ellipse(-bodyR*.35,-bodyR*.4,bodyR*.25,bodyR*.16,-.5,0,7); ctx.fill();
+
+  // head
+  const hr = 13;
+  ctx.fillStyle='#5a42a0';
+  ctx.beginPath(); ctx.arc(0,-bodyR*.9-hr*.4, hr,0,7); ctx.fill();
+
+  // eyes — get more "I should leave" as irritation rises
+  const worry = drinking? clamp(G.irritation/100,0,1) : 0;
+  const ex=0, eyy=-bodyR*.9-hr*.4;
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(ex-6,eyy-2,6.5,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(ex+6,eyy-2,6.5,0,7); ctx.fill();
+  ctx.fillStyle='#1a1033';
+  const pd = drinking? 1.2+worry*2 : Math.sin(t*2)*1.5;
+  ctx.beginPath(); ctx.arc(ex-6+pd,eyy-2+worry*2,2.6+worry*1.2,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(ex+6+pd,eyy-2+worry*2,2.6+worry*1.2,0,7); ctx.fill();
+  // sweat drop when nervous
+  if(worry>.6){
+    ctx.fillStyle='#9fd8ff';
+    ctx.beginPath(); ctx.arc(ex+12, eyy-10+Math.sin(t*10)*2, 3.4,0,7); ctx.fill();
+  }
+
+  // proboscis
+  ctx.strokeStyle='#2b1a4a'; ctx.lineWidth=3.5;
+  ctx.beginPath();
+  ctx.moveTo(0,-bodyR*.9-hr*.1);
+  if(drinking || G.state==='landed'){
+    ctx.quadraticCurveTo(2, -bodyR*.4, 4, bodyR*1.05); // into the cheek
+  } else {
+    ctx.quadraticCurveTo(10,-bodyR*.9-hr*.5, 16,-bodyR*.9-hr*.2);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // hint
+  if(G.state==='landed'){
+    pillText("HOLD TO DRINK", s.x, s.y-70, '#FFB23E');
+  }
+  if(drinking){
+    // blood counter
+    ctx.textAlign='center';
+    ctx.fillStyle='#FFF3D6';
+    ctx.font='800 44px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+    ctx.fillText(Math.round(G.blood)+' mL', W/2, 150);
+    ctx.fillStyle='#FFB23E';
+    ctx.font='800 20px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+    ctx.fillText('×'+multOf(G.holdT)+' greed', W/2, 178);
+    if(G.state==='windup'){
+      ctx.fillStyle = Math.sin(performance.now()/45)>0 ? '#FF4D5E' : '#FFF3D6';
+      ctx.font='900 30px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+      ctx.fillText('LET GO!!', W/2, 218);
+    }
+  }
+}
+
+function drawSplatScene(){
+  // flattened sippy on the cheek under hand edge
+  const p = clamp(G.t/.25,0,1);
+  if(p>=1){
+    ctx.save();
+    ctx.translate(LAND.x, LAND.y+10);
+    ctx.fillStyle='#4a3580';
+    ctx.beginPath(); ctx.ellipse(0,0, 40, 7, 0,0,7); ctx.fill();
+    ctx.fillStyle='#FF4D5E';
+    ctx.beginPath(); ctx.ellipse(6,2, 26, 4,0,0,7); ctx.fill();
+    // X eyes
+    ctx.strokeStyle='#FFF3D6'; ctx.lineWidth=2.5; ctx.lineCap='round';
+    [[-14,-4],[-4,-4]].forEach(([x,y])=>{
+      ctx.beginPath(); ctx.moveTo(x-3,y-3); ctx.lineTo(x+3,y+3);
+      ctx.moveTo(x+3,y-3); ctx.lineTo(x-3,y+3); ctx.stroke();
+    });
+    ctx.restore();
+    // ghost
+    const gt = Math.max(0, G.t-.5);
+    if(gt>0){
+      const gy = LAND.y - 30 - gt*55;
+      ctx.save(); ctx.globalAlpha = clamp(1.2-gt*.45,0,1);
+      ctx.translate(LAND.x + Math.sin(gt*3)*12, gy);
+      ctx.fillStyle='rgba(255,243,214,.9)';
+      ctx.beginPath();
+      ctx.arc(0,0,14,Math.PI,0);
+      ctx.lineTo(14,16);
+      for(let i=0;i<3;i++) ctx.quadraticCurveTo(14-9-i*9, 22, 14-14-i*9.3, 16);
+      ctx.closePath(); ctx.fill();
+      // halo
+      ctx.strokeStyle='#FFB23E'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.ellipse(0,-22,12,4,0,0,7); ctx.stroke();
+      // little eyes
+      ctx.fillStyle='#1a1033';
+      ctx.beginPath(); ctx.arc(-5,-3,2,0,7); ctx.fill();
+      ctx.beginPath(); ctx.arc(3,-3,2,0,7); ctx.fill();
+      // tiny harp
+      ctx.strokeStyle='#FFB23E'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(18,4,8,-1.2,1.6); ctx.stroke();
+      for(let i=0;i<3;i++){ ctx.beginPath(); ctx.moveTo(13+i*4,-2); ctx.lineTo(13+i*4,10); ctx.stroke(); }
+      ctx.restore();
+    }
+  }
+}
+
+/* ---------- bits ---------- */
+function drawZzz(){
+  G.zzz.forEach(z=>{
+    ctx.save();
+    ctx.translate(z.x,z.y); ctx.rotate(z.rot);
+    ctx.globalAlpha = clamp(z.life/1.2,0,1)*.8;
+    ctx.fillStyle = z.red? '#FF4D5E' : '#BFA8FF';
+    ctx.font='900 '+z.s+'px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+    ctx.fillText(z.red? 'Z?!':'Z', 0,0);
+    ctx.restore();
+  });
+  ctx.globalAlpha=1;
+}
+function drawParticles(){
+  G.particles.forEach(p=>{
+    ctx.globalAlpha = clamp(p.life,0,1);
+    ctx.fillStyle = p.c;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+function pillText(txt,x,y,color){
+  ctx.font='800 15px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+  const w = ctx.measureText(txt).width+26;
+  ctx.fillStyle='rgba(20,12,40,.85)';
+  rounded(x-w/2,y-16,w,30,15); ctx.fill();
+  ctx.fillStyle=color; ctx.textAlign='center';
+  ctx.fillText(txt,x,y+5);
+}
+function rounded(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawHUD(){
+  if(G.state==='title') return;
+  ctx.textAlign='left';
+  ctx.fillStyle='rgba(255,243,214,.55)';
+  ctx.font='800 12px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+  ctx.fillText('TONIGHT', 18, 30);
+  ctx.fillText('BEST', W-70, 30);
+  ctx.fillStyle='#FFF3D6';
+  ctx.font='900 24px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+  ctx.fillText(G.banked+' mL', 18, 56);
+  ctx.textAlign='right';
+  ctx.fillText(G.best+'', W-18, 56);
+  ctx.textAlign='center';
+
+  if(G.giant && G.state!=='gameover'){
+    ctx.fillStyle='#FFF3D6';
+    ctx.font='900 17px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+    ctx.fillText('NIGHT '+G.night+' — '+G.giant.name, W/2, 96);
+    ctx.fillStyle='#FFB23E';
+    ctx.font='800 13px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+    ctx.fillText(G.giant.type.label+'  ·  '+G.giant.type.hint, W/2, 116);
+  }
+  if(G.msgT>0){
+    pillText(G.msg, W/2, H*.31, '#FFB23E');
+  }
+}
+
+function drawTitle(){
+  const t=performance.now()/1000;
+  ctx.fillStyle='rgba(14,8,35,.45)'; ctx.fillRect(0,0,W,H);
+
+  // big bobbing sippy
+  ctx.save();
+  ctx.translate(W/2 + Math.sin(t*1.2)*10, H*.30 + Math.sin(t*2.2)*8);
+  ctx.scale(2.4,2.4);
+  const bodyR=18;
+  const wA=Math.sin(t*26)*.9;
+  ctx.fillStyle='rgba(255,243,214,.45)';
+  ctx.save(); ctx.rotate(-.5+wA*.3); ctx.beginPath(); ctx.ellipse(-6,-bodyR-8,bodyR*.9,bodyR*.42,0,0,7); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.rotate(.2-wA*.3); ctx.beginPath(); ctx.ellipse(8,-bodyR-8,bodyR*.9,bodyR*.42,0,0,7); ctx.fill(); ctx.restore();
+  ctx.strokeStyle='#2b1a4a'; ctx.lineWidth=2.5; ctx.lineCap='round';
+  for(let i=0;i<3;i++){
+    const lx=-bodyR*.5+i*bodyR*.5, sway=Math.sin(t*8+i)*3;
+    ctx.beginPath(); ctx.moveTo(lx,bodyR*.7); ctx.quadraticCurveTo(lx+sway,bodyR*1.3,lx+sway*1.5,bodyR*1.6); ctx.stroke();
+  }
+  ctx.fillStyle='#4a3580'; ctx.beginPath(); ctx.ellipse(0,0,bodyR,bodyR*.92,0,0,7); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.ellipse(0,0,bodyR-3,bodyR*.92-3,0,0,7); ctx.clip();
+  ctx.fillStyle='#FF4D5E'; ctx.fillRect(-bodyR, bodyR*.3, bodyR*2, bodyR);
+  ctx.restore();
+  ctx.fillStyle='rgba(255,255,255,.25)';
+  ctx.beginPath(); ctx.ellipse(-7,-8,5,3,-.5,0,7); ctx.fill();
+  ctx.fillStyle='#5a42a0'; ctx.beginPath(); ctx.arc(0,-bodyR*1.1,9,0,7); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(-4,-bodyR*1.15,4.5,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(4,-bodyR*1.15,4.5,0,7); ctx.fill();
+  ctx.fillStyle='#1a1033';
+  const px=Math.sin(t*1.5)*1.5;
+  ctx.beginPath(); ctx.arc(-4+px,-bodyR*1.13,1.9,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(4+px,-bodyR*1.13,1.9,0,7); ctx.fill();
+  ctx.strokeStyle='#2b1a4a'; ctx.lineWidth=2.2;
+  ctx.beginPath(); ctx.moveTo(2,-bodyR*1.0); ctx.quadraticCurveTo(12,-bodyR*.8,16,-bodyR*.55); ctx.stroke();
+  ctx.restore();
+
+  ctx.textAlign='center';
+  ctx.fillStyle='#FF4D5E';
+  ctx.font='900 72px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+  ctx.fillText('SIPPY', W/2, H*.52);
+  ctx.fillStyle='#FFF3D6';
+  ctx.font='800 18px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+  ctx.fillText('HOLD to drink. RELEASE to live.', W/2, H*.575);
+  ctx.fillStyle='#FFB23E';
+  ctx.font='800 14px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+  ctx.fillText('Greed kills. Greed also pays. Choose.', W/2, H*.61);
+
+  const pulse=.7+.3*Math.sin(t*3.5);
+  ctx.globalAlpha=pulse;
+  pillText('TAP TO START', W/2, H*.72, '#FFF3D6');
+  ctx.globalAlpha=1;
+
+  if(G.best>0){
+    ctx.fillStyle='rgba(255,243,214,.5)';
+    ctx.font='800 13px "Arial Rounded MT Bold","Segoe UI",sans-serif';
+    ctx.fillText('best night: '+G.best+' mL', W/2, H*.78);
+  }
+}
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+function frame(now){
+  const dt = Math.min(0.033, (now-last)/1000);
+  last = now;
+  update(dt);
+  render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

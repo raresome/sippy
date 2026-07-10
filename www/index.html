@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#191033" />
+  <title>SIPPY — one more sip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <button id="mute" class="icon-btn" aria-label="Mute">🔊</button>
+  <button id="settings" class="icon-btn second" aria-label="Settings">⚙️</button>
+  <button id="hats" class="icon-btn left" aria-label="Hats">🎩</button>
+  <button id="stats" class="icon-btn left second" aria-label="Stats">📊</button>
+
+  <div class="overlay" id="overShop">
+    <div class="card shop">
+      <div class="shop-tabs">
+        <button class="tab-btn active" id="tabHats">Hats</button>
+        <button class="tab-btn" id="tabUpgrades">Upgrades</button>
+      </div>
+      <div class="shop-pane active" id="paneHats">
+        <div class="sub">Sippy keeps the hat — even as a ghost.</div>
+        <div id="shop-grid" class="shop-grid"></div>
+      </div>
+      <div class="shop-pane" id="paneUpgrades">
+        <div class="sub">Available Blood: <b id="shopBlood" class="amber-text">0 mL</b></div>
+        <div id="upgrades-list" class="upgrades-list"></div>
+      </div>
+      <button class="btn" id="shopClose">Done</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overGameover">
+    <div class="card">
+      <h2 id="goTitle">SPLAT.</h2>
+      <div class="sub" id="goSub">Greed got you.</div>
+      <div class="statrow"><span>Blood banked</span><b id="goBank">0 mL</b></div>
+      <div class="statrow"><span>Lost in the slap</span><b class="red" id="goLost">0 mL</b></div>
+      <div class="statrow"><span>Giants survived</span><b id="goGiants">0</b></div>
+      <div class="statrow"><span>Closest call</span><b id="goClose">—</b></div>
+      <div class="statrow"><span>Best night ever</span><b id="goBest">0 mL</b></div>
+    </div>
+    <button class="btn" id="btnRetry">One more night 🦟</button>
+    <button class="btn ghost" id="btnShop">Shop · spend blood 🎩</button>
+    <button class="btn ghost" id="btnGoStats">Stats &amp; achievements 📊</button>
+    <button class="btn ghost" id="btnBrag">Copy brag for the group chat</button>
+  </div>
+
+  <!-- Pause overlay (Android back button, spec §7). Freezes the update loop. -->
+  <div class="overlay" id="overPause">
+    <div class="card">
+      <h2>PAUSED</h2>
+      <div class="sub">The giant waits. So does the blood.</div>
+    </div>
+    <button class="btn" id="btnResume">Resume 🦟</button>
+    <button class="btn ghost" id="btnQuit">Quit to title</button>
+  </div>
+
+  <!-- Second Wind: rewarded-ad revive, offered on the corpse before the game-over card. -->
+  <div class="overlay" id="overSecondWind">
+    <div class="card">
+      <h2>👻 SECOND WIND?</h2>
+      <div class="sub" id="swSub">Sippy's ghost refuses to leave.</div>
+      <div class="statrow"><span>Blood you keep</span><b id="swBank">0 mL</b></div>
+      <div class="statrow"><span>This sip, lost</span><b class="red" id="swLost">0 mL</b></div>
+      <div class="sub" id="swCap" style="margin:12px 0 0;">Revive 1 of 3 tonight.</div>
+    </div>
+    <button class="btn" id="btnSecondWind">Watch ad · un-splat 🦟</button>
+    <button class="btn ghost" id="btnLetHimGo">No. Let him go.</button>
+  </div>
+
+  <!-- Lifetime player stats + achievements. -->
+  <div class="overlay" id="overStats">
+    <div class="card stats-card">
+      <h2>📊 STATS</h2>
+      <div class="sub">Everything Sippy has bled for.</div>
+
+      <div class="stats-scroll">
+        <div class="statrow"><span>Best night</span><b id="stBest">0 mL</b></div>
+        <div class="statrow"><span>Lifetime blood</span><b id="stLifetime">0 mL</b></div>
+        <div class="statrow"><span>Blood to spend</span><b id="stPool">0 mL</b></div>
+        <div class="statrow"><span>Closest call</span><b id="stClosest">—</b></div>
+        <div class="statrow"><span>Nights played</span><b id="stNights">0</b></div>
+        <div class="statrow"><span>Giants survived</span><b id="stGiants">0</b></div>
+        <div class="statrow"><span>Most giants in a night</span><b id="stBestGiants">0</b></div>
+        <div class="statrow"><span>Splats</span><b class="red" id="stSplats">0</b></div>
+        <div class="statrow"><span>Blood lost to slaps</span><b class="red" id="stLost">0 mL</b></div>
+        <div class="statrow"><span>Clutch escapes</span><b id="stClutches">0</b></div>
+        <div class="statrow"><span>Best combo</span><b id="stCombo">0</b></div>
+        <div class="statrow"><span>Perfect landings</span><b id="stPerfect">0</b></div>
+        <div class="statrow"><span>Second winds</span><b id="stSecondWinds">0</b></div>
+
+        <div class="ach-header">Achievements <span id="stAchCount" class="amber-text">0/7</span></div>
+        <div id="ach-list" class="ach-list"></div>
+      </div>
+
+      <div class="pg-row">
+        <button class="btn ghost" id="btnLeaderboards">🏆 Leaderboards</button>
+        <button class="btn ghost" id="btnAchievements">🎖 Play Games</button>
+      </div>
+      <button class="btn" id="statsClose">Done</button>
+    </div>
+  </div>
+
+  <!-- Settings: mute, restore purchases, and the UMP privacy re-consent form. -->
+  <div class="overlay" id="overSettings">
+    <div class="card">
+      <h2>⚙️ SETTINGS</h2>
+      <div class="sub">one more sip.</div>
+      <div class="statrow"><span>Sound</span><b id="setMuteState">On</b></div>
+      <button class="btn ghost" id="btnToggleMute">Toggle sound</button>
+      <button class="btn ghost" id="btnRemoveAds">Remove ads · $9.99</button>
+      <button class="btn ghost" id="btnRestore">Restore purchases</button>
+      <button class="btn ghost" id="btnPrivacy" hidden>Privacy options</button>
+      <button class="btn ghost" id="btnPolicy">Privacy policy</button>
+      <button class="btn" id="settingsClose">Done</button>
+    </div>
+  </div>
+
+  <div id="toast">Copied!</div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
