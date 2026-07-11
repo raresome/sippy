@@ -60,15 +60,14 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
       after the id is real (a placeholder makes Play Services error on every launch).
 
 ## Privacy policy
-- [ ] Publish `store-assets/privacy-policy.html` to a public URL.
-- [ ] **GitHub Pages hosting:** the repo pushes to GitHub as a PUBLIC repo named `sippy`. Enable
-      Pages (Settings → Pages → branch `master`, root) to serve the file. The URL resolves to
-      `https://<owner>.github.io/sippy/privacy-policy.html`.
-- [ ] Confirm the URL in Play Console **and** in `www/js/main.js` (`PRIVACY_POLICY_URL`) match.
-      App value is hardcoded to `https://genartstudios.github.io/sippy/privacy-policy.html` — this
-      only resolves if the repo owner is an account/org named `genartstudios`. If the owner
-      username differs, update `PRIVACY_POLICY_URL` to `https://<owner>.github.io/sippy/...`.
-- [ ] Replace the placeholder contact email `support@genartstudios.com` with a real, monitored inbox.
+- [x] **Published via GitHub Pages** — the published file is `privacy-policy.html` at the REPO ROOT
+      (source-of-record markdown stays at `store-assets/privacy-policy.md`). Repo:
+      `github.com/raresome/sippy` (public), Pages source `master`/root.
+      Live URL: **https://raresome.github.io/sippy/privacy-policy.html** (allow a few minutes on
+      first publish). This matches `PRIVACY_POLICY_URL` in `www/js/main.js`.
+- [ ] Paste that URL into Play Console → App content → Privacy policy.
+- [ ] Replace the placeholder contact email `support@genartstudios.com` with a real, monitored inbox
+      (edit `privacy-policy.html` at the repo root and `store-assets/privacy-policy.md`).
 
 ## Build & release
 - [ ] `versionCode` / `versionName` set (currently 1 / "1.0" in `android/app/build.gradle`).
