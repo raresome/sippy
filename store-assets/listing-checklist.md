@@ -18,9 +18,10 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
 ## Graphics
 - [ ] **App icon** 512×512 (<1 MB). ✔ `graphics/icon-512.png` (master `graphics/icon-1024.png`).
 - [ ] **Feature graphic** 1024×500 (<15 MB). ✔ `graphics/feature-graphic.png`.
-- [ ] **Screenshots** (2–8, captured by hand on device — NOT generated). Money shots: the SPLAT frame,
-      a CLUTCH escape with the ×1.5 popup, the hat shop, a big banked-mL game-over card, the ghost
-      keeping its hat.
+- [x] **Screenshots** (8) in `graphics/../screenshots/` (720×1280 portrait): title, drinking,
+      windup "LET GO!!", splat+ghost, Second Wind, game-over, hat shop, stats. Captured from the
+      web build at phone res (identical renderer, no ads). Re-shoot on-device if you want the status
+      bar; see `store-assets/screenshots/README.md`.
 - [ ] Promo video (optional): shoot per `video-concept.md`, portrait 9:16.
 - [ ] **A/B icon test later:** try a **blood-red `#FF4D5E`** background against the default
       night-purple `#241647` — red pops harder on a crowded arcade shelf.
@@ -70,8 +71,21 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
       (edit `privacy-policy.html` at the repo root and `store-assets/privacy-policy.md`).
 
 ## Build & release
-- [ ] `versionCode` / `versionName` set (currently 1 / "1.0" in `android/app/build.gradle`).
-- [ ] Signed **.aab** via `gradlew bundleRelease` with the upload keystore (kept out of the repo).
-- [ ] `bundletool` installs the AAB locally as a final smoke test.
+- [x] `versionCode` / `versionName` = 1 / "1.0" (`android/app/build.gradle`). Bump versionCode for
+      every subsequent Play upload.
+- [x] **Upload keystore created** — `sippy-upload-keystore.jks` in `C:\My_Apps\_credentials\Sippy\`
+      (alias `sippy-upload`, RSA 2048, ~year 2053). Passwords + SHA-1/SHA-256 fingerprints are in
+      `sippy-keystore-info.txt` beside it. **Back this folder up offline — do not lose it.**
+- [x] **Release signing wired** — `android/key.properties` (gitignored) points Gradle at the
+      keystore; `app/build.gradle` has a `signingConfigs.release`.
+- [x] **Signed .aab built** — `gradlew bundleRelease` → `app-release.aab`, verified signed by
+      "CN=Gen Art Studios". A copy is at `C:\My_Apps\_credentials\Sippy\sippy-v1-vc1-release.aab`.
+- [ ] Upload that `.aab` to Play Console → Production (or a closed test track first — a new
+      *personal* Play account must run a 14-day, 12-tester closed test before production).
+- [ ] Enroll in **Play App Signing** when prompted (recommended; Google holds the app-signing key,
+      this keystore stays your *upload* key).
+- [ ] After the first upload, register the keystore SHA-1 in the **Firebase console** (Project
+      settings → your Android app → Add fingerprint) so Analytics/Play Games auth works, and add
+      the Play App Signing SHA-1 too once Play generates it.
 - [ ] Target countries at launch: start with **US/worldwide English**. Cheap-reach localized listings
       to consider once you see organic impressions: Spanish, Portuguese (BR), Indonesian, Hindi.
