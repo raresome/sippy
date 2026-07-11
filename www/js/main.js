@@ -15,8 +15,9 @@ import * as save from './save.js';
 import { games, iap, ads, analytics } from './native.js';
 import { ACHIEVEMENT_META } from './gameids.js';
 
-// Published by the owner (spec §11 item 8). Replace before the Play Console listing goes live.
-const PRIVACY_POLICY_URL = 'https://genartstudios.github.io/sippy/privacy-policy.html';
+// Published via GitHub Pages from the raresome/sippy repo (store-assets/privacy-policy.html).
+// If the repo is later moved to a `genartstudios` org, update this to that Pages URL.
+const PRIVACY_POLICY_URL = 'https://raresome.github.io/sippy/privacy-policy.html';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
