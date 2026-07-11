@@ -51,5 +51,10 @@ Requires JDK 21 for Gradle (Android Studio's bundled JBR works; `android/gradle.
 
 Playable end-to-end and verified on device. Wired: AdMob (rewarded/interstitial/banner + UMP
 consent), Firebase Analytics, local Play Games plugin, hat shop, upgrades, trails, stats,
-achievements, pause. **Pending owner setup:** RevenueCat in-app purchases, real Play Games Console
-IDs, and the AdMob consent form — see `store-assets/listing-checklist.md`.
+achievements, pause. **Release-ready:** a signed release `.aab` builds via `gradlew bundleRelease`,
+and the full Play listing package (text, icon, feature graphic, 8 screenshots, data-safety answers)
+is in `store-assets/`.
+
+**Pending owner setup** before Play submission: RevenueCat in-app purchases, real Play Games Console
+IDs, the AdMob consent form, and a real support email — the step-by-step list is in
+`store-assets/listing-checklist.md`.
