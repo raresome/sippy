@@ -3,7 +3,7 @@
 **App:** SIPPY (`com.genartstudios.sippy`)
 **Developer:** Gen Art Studios
 **Last updated:** 10 July 2026
-**Contact:** support@genartstudios.com
+**Contact:** hello@genartstudios.com
 
 Gen Art Studios ("we", "us") built SIPPY as a free game supported by ads and optional
 in‑app purchases. This policy explains what data the app collects, why, and the choices you
@@ -98,4 +98,4 @@ and — where required — surface the change in the app.
 ## Contact
 
 Questions about this policy or your data:
-**support@genartstudios.com**
+**hello@genartstudios.com**

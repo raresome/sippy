@@ -2,12 +2,34 @@
 
 Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
 
+> ## STATUS 2026-07-13 — first closed build is STAGED AS A DRAFT
+> Pushed to Play Console via the Android Publisher API (service account
+> `play-publisher@graceful-karma-502020-u1`, creds in `C:\My_Apps\_credentials\Google_Play_Android_Developer_API\`):
+> **AAB versionCode 1** (sha1 `100a8a6395695eaf…`, the first bundle ever uploaded), the full en-US
+> listing, the icon + feature graphic + all 8 screenshots, and a **draft** release
+> "1.0 (1) - Closed test" on the **alpha** track (= Play's "Closed testing").
+>
+> **Draft means nothing has been sent to Google for review.** The Play Developer API has **no
+> endpoint for the "App content" section** — verified against the v3 discovery doc, `edits` exposes
+> only apks/bundles/countryavailability/deobfuscationfiles/details/expansionfiles/images/listings/
+> testers/tracks. So content rating, data safety, target audience, ads declaration, app access and
+> the privacy-policy URL field are **web-UI only**, as are country selection and tester email lists.
+> Everything still marked `[ ]` below has to be done by hand in the Console.
+>
+> Re-run the push with `store-assets/../tools`-style scripting if the listing changes; always
+> `POST edits/{id}:validate` before `:commit` (edits are atomic, so a failed run changes nothing).
+> Gotcha: listing images live at `edits/{id}/listings/{lang}/{imageType}` — there is no `/images/` path.
+
 ## Store text
-- [ ] **Title** ≤30 chars, contains the hook: `SIPPY: One More Sip` (19 chars). ✔ in `text/title.txt`
-- [ ] **Short description** ≤80 chars (79). ✔ in `text/short-description.txt`
-- [ ] **Full description** 3000–3800 chars (3004), keyword "push-your-luck arcade game" in first AND
-      last paragraph. ✔ in `text/full-description.txt`
-- [ ] **What's new** ≤500 chars. ✔ in `text/whats-new.txt`
+- [x] **Title** ≤30 chars, contains the hook: `SIPPY: One More Sip` (19 chars). ✔ in `text/title.txt`
+      — **live in the Console listing.**
+- [x] **Short description** ≤80 chars (79). ✔ `text/short-description.txt` — **live.**
+- [x] **Full description** 3000–3800 chars (2944), keyword "push-your-luck arcade game" in first AND
+      last paragraph. ✔ `text/full-description.txt` — **live.**
+- [x] **What's new** ≤500 chars (396). ✔ `text/whats-new.txt` — **attached to the draft release.**
+- [ ] NOTE: the description advertises leaderboards, achievements and hat purchases, which the build
+      does not actually ship yet (Play Games IDs are placeholders, IAP is a stub). Accepted for the
+      closed test; revisit before production so the copy matches the build.
 
 ## Category & tags
 - [ ] **Category:** Games → **Arcade** (primary). Alt: Casual.
@@ -15,9 +37,9 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
 - [ ] Best keyword-forward title alternative to A/B later: `SIPPY: Arcade Reflex Game` (25 chars) —
       only if the brand-led title underperforms on impressions.
 
-## Graphics
-- [ ] **App icon** 512×512 (<1 MB). ✔ `graphics/icon-512.png` (master `graphics/icon-1024.png`).
-- [ ] **Feature graphic** 1024×500 (<15 MB). ✔ `graphics/feature-graphic.png`.
+## Graphics — all uploaded to the Console listing
+- [x] **App icon** 512×512 (<1 MB). ✔ `graphics/icon-512.png` (master `graphics/icon-1024.png`).
+- [x] **Feature graphic** 1024×500 (<15 MB). ✔ `graphics/feature-graphic.png`.
 - [x] **Screenshots** (8) in `graphics/../screenshots/` (720×1280 portrait): title, drinking,
       windup "LET GO!!", splat+ghost, Second Wind, game-over, hat shop, stats. Captured from the
       web build at phone res (identical renderer, no ads). Re-shoot on-device if you want the status
@@ -61,14 +83,14 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
       after the id is real (a placeholder makes Play Services error on every launch).
 
 ## Privacy policy
-- [x] **Published via GitHub Pages** — the published file is `privacy-policy.html` at the REPO ROOT
-      (source-of-record markdown stays at `store-assets/privacy-policy.md`). Repo:
-      `github.com/raresome/sippy` (public), Pages source `master`/root.
-      Live URL: **https://raresome.github.io/sippy/privacy-policy.html** (allow a few minutes on
-      first publish). This matches `PRIVACY_POLICY_URL` in `www/js/main.js`.
+- [x] **Published on the owner's own domain** (2026-07-13). Canonical live URL:
+      **https://genartstudios.com/apps/sippy/privacy-policy** — note there is NO `.html` suffix
+      (the `.html` variant 404s). This matches `PRIVACY_POLICY_URL` in `www/js/main.js`.
+      Source-of-record markdown stays at `store-assets/privacy-policy.md`; the GitHub-Pages copy at
+      `raresome.github.io/sippy/privacy-policy.html` is now a stale mirror, not the canonical URL.
 - [ ] Paste that URL into Play Console → App content → Privacy policy.
-- [ ] Replace the placeholder contact email `support@genartstudios.com` with a real, monitored inbox
-      (edit `privacy-policy.html` at the repo root and `store-assets/privacy-policy.md`).
+- [x] Contact email resolved to the real inbox **hello@genartstudios.com** (matches the published
+      policy and the Play Console contact email). The old `support@` placeholder is gone.
 
 ## Build & release
 - [x] `versionCode` / `versionName` = 1 / "1.0" (`android/app/build.gradle`). Bump versionCode for
@@ -79,9 +101,15 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
 - [x] **Release signing wired** — `android/key.properties` (gitignored) points Gradle at the
       keystore; `app/build.gradle` has a `signingConfigs.release`.
 - [x] **Signed .aab built** — `gradlew bundleRelease` → `app-release.aab`, verified signed by
-      "CN=Gen Art Studios". A copy is at `C:\My_Apps\_credentials\Sippy\sippy-v1-vc1-release.aab`.
-- [ ] Upload that `.aab` to Play Console → Production (or a closed test track first — a new
-      *personal* Play account must run a 14-day, 12-tester closed test before production).
+      "CN=Gen Art Studios". The copy at `C:\My_Apps\_credentials\Sippy\sippy-v1-vc1-release.aab` was
+      REBUILT 2026-07-13 and is byte-identical to the bundle Play accepted (sha1 `100a8a6395695eaf…`).
+      The previous 07-11 copy was stale — it had the old GitHub-Pages privacy URL baked in.
+- [x] **Uploaded** to the **alpha / Closed testing** track as a **draft** release (see STATUS block).
+- [ ] Promote the draft: Testing → Closed testing → Edit release → Review release → Start rollout.
+      Cannot happen until App content below is complete.
+- [ ] Add closed-track **testers** (email list or Google Group) and select **countries** — UI only.
+- [ ] A new *personal* Play account must run a **14-day, 12-tester** closed test before it can apply
+      for production access. Line the testers up now if that applies.
 - [ ] Enroll in **Play App Signing** when prompted (recommended; Google holds the app-signing key,
       this keystore stays your *upload* key).
 - [ ] After the first upload, register the keystore SHA-1 in the **Firebase console** (Project

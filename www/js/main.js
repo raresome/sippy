@@ -17,7 +17,7 @@ import { ACHIEVEMENT_META } from './gameids.js';
 
 // Published via GitHub Pages from the raresome/sippy repo (store-assets/privacy-policy.html).
 // If the repo is later moved to a `genartstudios` org, update this to that Pages URL.
-const PRIVACY_POLICY_URL = 'https://raresome.github.io/sippy/privacy-policy.html';
+const PRIVACY_POLICY_URL = 'https://genartstudios.com/apps/sippy/privacy-policy';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');

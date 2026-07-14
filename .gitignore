@@ -22,3 +22,7 @@ key.properties
 .playwright-mcp/
 # Loose device/dev screenshots captured during past sessions
 /_*.png
+
+# Python bytecode
+__pycache__/
+*.pyc
