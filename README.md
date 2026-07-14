@@ -4,7 +4,7 @@ A push-your-luck comedy arcade game. You're a mosquito: land on a sleeping giant
 drink**, and **let go the instant before the slap**. Every extra drop is worth more — and wakes the
 giant faster. Bank your blood, buy upgrades and hats, and chase the frame-perfect clutch escape.
 
-**Package:** `com.genartstudios.sippy` · **Privacy policy:** https://raresome.github.io/sippy/privacy-policy.html
+**Package:** `com.genartstudios.sippy` · **Privacy policy:** https://genartstudios.com/apps/sippy/privacy-policy
 
 ## Tech
 

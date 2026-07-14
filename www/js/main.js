@@ -15,8 +15,8 @@ import * as save from './save.js';
 import { games, iap, ads, analytics } from './native.js';
 import { ACHIEVEMENT_META } from './gameids.js';
 
-// Published via GitHub Pages from the raresome/sippy repo (store-assets/privacy-policy.html).
-// If the repo is later moved to a `genartstudios` org, update this to that Pages URL.
+// Hosted on the owner's own domain; source of record is store-assets/privacy-policy.md.
+// No `.html` suffix — that variant 404s. This is also the URL registered with Play Console.
 const PRIVACY_POLICY_URL = 'https://genartstudios.com/apps/sippy/privacy-policy';
 
 const canvas = document.getElementById('game');

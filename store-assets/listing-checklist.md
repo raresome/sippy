@@ -86,8 +86,9 @@ Tailored to SIPPY. Work top to bottom in Play Console before hitting publish.
 - [x] **Published on the owner's own domain** (2026-07-13). Canonical live URL:
       **https://genartstudios.com/apps/sippy/privacy-policy** — note there is NO `.html` suffix
       (the `.html` variant 404s). This matches `PRIVACY_POLICY_URL` in `www/js/main.js`.
-      Source-of-record markdown stays at `store-assets/privacy-policy.md`; the GitHub-Pages copy at
-      `raresome.github.io/sippy/privacy-policy.html` is now a stale mirror, not the canonical URL.
+      Source-of-record markdown stays at `store-assets/privacy-policy.md`. The old GitHub-Pages copy
+      (`raresome.github.io/sippy/privacy-policy.html`) was DELETED on 2026-07-13 — there is now
+      exactly one published policy in the world. Do not re-publish a second copy anywhere.
 - [ ] Paste that URL into Play Console → App content → Privacy policy.
 - [x] Contact email resolved to the real inbox **hello@genartstudios.com** (matches the published
       policy and the Play Console contact email). The old `support@` placeholder is gone.
